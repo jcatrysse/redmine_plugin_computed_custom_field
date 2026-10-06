@@ -96,14 +96,18 @@ class ModelPatchTest < ComputedCustomFieldTestCase
     assert_equal new_issue.id.to_s, new_issue.reload.custom_field_value(field.id)
   end
 
-  def test_error_after_create_rolls_back
+  def test_error_after_create_keeps_the_value_from_before_the_insert
     field = field_with_string_format
     field.update_attribute(:formula, "id ? 1 / 0 : 'x'")
-    new_issue = Issue.new(project_id: 1, tracker_id: 1, author_id: 2, subject: 'Rolled back')
-    assert_no_difference 'Issue.count' do
-      assert_not new_issue.save
+    new_issue = Issue.new(project_id: 1, tracker_id: 1, author_id: 2, subject: 'Created')
+    # inside an outer transaction (project copy, import), as a rollback would not undo the insert
+    Issue.transaction do
+      assert new_issue.save
     end
-    assert new_issue.new_record?
+    assert new_issue.errors.empty?
+    assert_equal 'x', new_issue.reload.custom_field_value(field.id)
+    # the next save shows the error, as before
+    assert_not new_issue.save
     assert_match(/divided by 0/, new_issue.errors[:base].join)
   end
 

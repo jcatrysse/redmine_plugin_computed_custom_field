@@ -11,10 +11,14 @@ module ComputedCustomField
 
     # id, created_on and the like only exist after the insert: compute again,
     # before after_save stores the custom values. A formula that only fails
-    # now rolls the creation back with its error.
+    # now keeps its value from before the insert: refusing is too late here
+    # (a rollback is lost in an outer transaction), the next save shows it.
     def eval_computed_fields_after_create
       eval_computed_fields
-      raise ActiveRecord::Rollback if errors.any?
+      return if errors.empty?
+
+      Rails.logger.warn "computed_custom_field: #{self.class.name} ##{id}: #{errors.full_messages.join(', ')}"
+      errors.clear
     end
 
     def eval_computed_fields
