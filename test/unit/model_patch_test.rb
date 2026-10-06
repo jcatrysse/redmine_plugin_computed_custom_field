@@ -14,11 +14,11 @@ class ModelPatchTest < ComputedCustomFieldTestCase
 
   def test_bool_computation
     field = field_with_bool_format
-    field.update_attributes(formula: '1 == 1')
+    field.update(formula: '1 == 1')
     issue.save
     assert_equal '1', issue.custom_field_value(field.id)
 
-    field.update_attributes(formula: '1 == 0')
+    field.update(formula: '1 == 0')
     issue.save
     assert_equal '0', issue.custom_field_value(field.id)
   end
@@ -41,7 +41,7 @@ class ModelPatchTest < ComputedCustomFieldTestCase
   def test_multiple_list_computation
     field = field_with_list_format
     formula = "['Stable', 'Beta'] if id == #{issue.id}"
-    field.update_attributes(formula: formula, multiple: true)
+    field.update(formula: formula, multiple: true)
     issue.save!
     assert_equal %w[Beta Stable], issue.custom_field_value(field.id).sort
   end
@@ -76,7 +76,7 @@ class ModelPatchTest < ComputedCustomFieldTestCase
 
   def test_multiple_user_computation
     field = field_with_user_format
-    field.update_attributes(formula: '[assigned_to, author_id]', multiple: true)
+    field.update(formula: '[assigned_to, author_id]', multiple: true)
     issue.save
     assert_equal %w[2 3], issue.custom_field_value(field.id).sort
   end

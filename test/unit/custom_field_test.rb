@@ -40,7 +40,7 @@ class CustomFieldTest < ComputedCustomFieldTestCase
     assert field.is_computed?
     assert_equal '', field.formula
 
-    assert field.update_attributes(is_computed: false, editable: true, formula: nil)
+    assert field.update(is_computed: false, editable: true, formula: nil)
 
     assert field.is_computed?
     assert_equal '', field.formula
