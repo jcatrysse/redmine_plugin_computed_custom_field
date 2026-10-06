@@ -24,7 +24,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 2 |
 | Measured on | Redmine 7.0-stable-GEOxyz @ 8067e23, Rails 8.1.3.1, Ruby 3.3.6, PostgreSQL 16.15, MariaDB 10.11.14; Redmine 5.1-stable on Ruby 3.2.6 |
-| Migration session | 2026-10-06, done; see "Results" and "Open questions for Jan" |
+| Migration session | 2026-10-06, done, including Jan's answers to the open questions; see "Results" |
 | 5.1 compatible | yes: the same branch is green on Redmine 5.1 (17 runs, 0 failures) and behaves the same as master there |
 
 ## Already on this branch
@@ -35,9 +35,13 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | bdbf13f | `record.errors.add(:formula, ...)` instead of `errors[:formula] <<`: invalid formulas are refused again; tests `test_invalid_formula`, `test_formula_with_syntax_error_is_invalid` |
 | 396dfb1 | tests: `update_attributes` -> `update` (removed in Rails 6.1, failed on 5.1 too) |
 | 245a2f2 | the validator's `eval` gets the file name `(eval)`: on Ruby 3.3 a syntax error otherwise showed the server path (`eval at /.../formula_validator.rb:33`); asserted in `test_formula_with_syntax_error_is_invalid` |
-| 46b3285, 771686a | e2e scenarios `test/e2e/*.mjs`, seed `test/e2e/seed.rb`, screenshots in `docs/e2e/`, `docs/e2e/before/` (5.1), `docs/e2e/r7-unfixed/` (the bug) |
+| 1c06111, a74ba7d | computed fields are shown as text, not as an input, on every form (project, user, my account, registration, version, time entry, group, enumeration incl. project activities, document); issues unchanged. Decided by Jan. Tests `CustomFieldsHelperPatchTest` |
+| 68944da | `Document` added to `patch_models`: computed document fields are computed. Decided by Jan. Test `test_document_computation` |
+| 4afb67a | formulas are evaluated again after the insert (`after_create`), so `id`, `created_on` etc. are known on creation; a formula that only fails then rolls the creation back with its error. Tests `test_id_is_known_on_create`, `test_error_after_create_rolls_back` |
+| 674d2ad | `rake redmine:computed_custom_field:check_formulas [SAMPLE=20]`: checks every stored formula (form validation + the last objects of its type), saves nothing, exit 1 on a failure. Test `FormulaCheckTest` |
+| 46b3285, 771686a, f2e72c8 | e2e scenarios `test/e2e/*.mjs`, seed `test/e2e/seed.rb`, screenshots in `docs/e2e/`, `docs/e2e/before/` (5.1), `docs/e2e/r7-unfixed/` (the bug) |
 
-No schema change, no new gem, no new setting, no new string (locales unchanged).
+No schema change, no new gem, no new setting, no new string (locales unchanged). New: one rake task.
 
 ## Work list for the migration session
 
@@ -51,12 +55,12 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 **Open items from the analysis** (Dutch; where they conflict with a decision or a priority item above, those win)
 
 3. DONE = item 1.
-4. Productie-formules auditen: NIET UITGEVOERD, geen productiedata in deze sessie. Query en patronen staan in "After the upgrade"; de e2e toont dat zo'n formule (`start_date.to_s(:db)`) nu bij het opslaan van het veld geweigerd wordt, maar een formule die al in de database staat wordt niet opnieuw gevalideerd en blokkeert dan het opslaan van objecten.
+4. Productie-formules auditen: tool gebouwd (674d2ad, `rake redmine:computed_custom_field:check_formulas`), uitvoeren op productiedata is een stap van de upgrade (zie "After the upgrade"). Getest op de e2e-server: alle 15 formules ok (exit 0); met `start_date.to_s(:db)` in "E2E hours x1.5" geschreven buiten de validatie: `FAIL #5 ... wrong number of arguments (given 1, expected 0)`, met Issue #8 en #7 als voorbeelden, exit 1.
 5. DONE = item 2.
 
 **Checks**
 
-6. DONE. Tests: see "Results". 7.0-stable-GEOxyz PostgreSQL and MariaDB, and 5.1-stable: 17 runs, 42 assertions, 0 failures, 0 errors.
+6. DONE. Tests: see "Results". 7.0-stable-GEOxyz PostgreSQL and MariaDB, and 5.1-stable: 24 runs, 0 failures, 0 errors (numbers in "Results").
 7. DONE. Webhooks: the plugin changes no issue data outside the normal save; computed values are stored as ordinary custom values before the save, so the core payload (`issues/show.api.rsb`, rendered as the webhook owner) carries them. Verified: webhook created by `manager` on issue.updated, E2E base 6 -> 30, payload `{"id":2,"name":"E2E double","value":"60"}` (test/e2e/api_and_webhook.mjs). Nothing to change.
 8. DONE. Every function by hand in a browser: see "Inventory of functions".
 
@@ -67,10 +71,11 @@ Baseline (before any change, branch = master code, 7.0-stable-GEOxyz):
 - e2e baseline (generic smoke + core flows): smoke 10 shots 0 problems, core 6 shots 0 problems.
 
 After this branch:
-- Plugin tests at the final head: PostgreSQL 17 runs, 42 assertions, 0 failures, 0 errors; MariaDB 17 runs, 42 assertions, 0 failures, 0 errors; 5.1-stable (PostgreSQL, Ruby 3.2.6) 17 runs, 42 assertions, 0 failures, 0 errors. Together with custom_field_sql and redmine_depending_custom_fields (both `redmine70-migration`): 17 runs, 42 assertions, 0 failures.
+- Plugin tests at the final head: PostgreSQL 24 runs, 65 assertions, 0 failures, 0 errors; MariaDB 24 runs, 65 assertions, 0 failures, 0 errors; 5.1-stable (PostgreSQL, Ruby 3.2.6) 24 runs, 63 assertions, 0 failures, 0 errors. Together with custom_field_sql and redmine_depending_custom_fields (both `redmine70-migration`): 24 runs, 65 assertions, 0 failures. (First round, before Jan's answers: 17 runs, 42 assertions, 0 failures on all of them.)
 - `rails zeitwerk:check`: "All is good!". Production server (eager load) boots.
 - Migrations down to 0 and up again: OK on PostgreSQL and MariaDB (columns `formula`, `is_computed` removed and restored; ConvertCustomFields has no down, it is a data migration that is a no-op on the way down).
-- e2e on PostgreSQL (`./.codex/e2e.sh`, production mode): smoke 10, core 6, plugin scenarios 6 files / 39 shots, 0 problems. On MariaDB (`start_server.sh --reset`): same counts, 0 problems (screenshots looked at, not committed: identical to PostgreSQL). Together with custom_field_sql + redmine_depending_custom_fields: same counts, 0 problems.
+- e2e on PostgreSQL (`./.codex/e2e.sh`, production mode, fresh database): smoke 10, core 6, plugin scenarios 6 files / 44 shots, 0 problems. On MariaDB (`start_server.sh --reset`): same counts, 0 problems (screenshots looked at, not committed: identical to PostgreSQL). Together with custom_field_sql + redmine_depending_custom_fields: same counts, 0 problems.
+- The e2e run found one regression of the read-only change before it was committed as done: the project settings page (activities tab) gave a 500, because `show_value` calls `customized.visible?` and enumerations have none; fixed in a74ba7d with a test.
 - Before (`docs/e2e/before/`, master code on Redmine 5.1): formula_validation, formula_form, issue_computation, runtime_error, other_models, 35 shots, 0 problems: the branch on 7 behaves as master on 5.1.
 - The bug (`docs/e2e/r7-unfixed/`, master code on Redmine 7): formula_validation 7 problems (all four invalid formulas saved, `1 / 0` stored on "E2E double"), after which every issue save is refused.
 - Cross-plugin (rails runner, rolled back): a computed string field over a `depending_list` field gives `BETA` for `Beta`; a computed `progressbar` field (format new in Redmine 7) gives 40 for 4 h. OK.
@@ -90,21 +95,27 @@ After this branch:
 | Computed values as issue list column | Issues, options | issue_computation.mjs | issue_computation-list-column |
 | As Reporter (no extra permissions) and outsider | issue view, new issue, private project | issue_computation.mjs | issue_computation-as-reporter, -created-by-reporter, -outsider-refused |
 | Runtime formula error blocks the save with the message (form and REST) | New / edit issue, POST /issues.json | runtime_error.mjs | runtime_error-create-refused, -edit-refused, -edit-not-stored, -nothing-stored |
-| Computation on Project, Version, TimeEntry, User, Group, Enumeration (activity) | their own forms | other_models.mjs | other_models-project, -version, -time-entry, -my-account, -user, -group, -activity |
+| Computation on Project, Version, TimeEntry, User, Group, Enumeration (activity), Document | their own forms | other_models.mjs | other_models-project, -version, -time-entry, -user, -document |
+| Computed fields shown as text, not as input, on every form; a forged value is ignored | project settings, version, log time, my account, group, activity, new document | other_models.mjs | other_models-project-form, -time-entry, -my-account, -group, -activity, -document-form |
+| `id` known on creation (computed again after the insert) | new issue, new document | issue_computation.mjs, other_models.mjs | issue_computation-created, other_models-document |
+| A formula failing only after the insert rolls the creation back (form and REST) | new issue, POST /issues.json | runtime_error.mjs | runtime_error-create-late-refused, -late-not-stored |
+| Formula check of stored formulas | `rake redmine:computed_custom_field:check_formulas` | command line on the e2e server | output quoted in work item 4 |
 | REST API: computed value cannot be forged, values returned; private issue 403 for outsider | POST/PUT/GET /issues.json | api_and_webhook.mjs | api_and_webhook-api-issue (results in the console output, quoted in "Results") |
 | Webhooks (Redmine 7) carry the computed values | /webhooks | api_and_webhook.mjs | api_and_webhook-webhook-form, -webhook-created, -webhook-issue |
 | Migrations (3), incl. the old `computed` format conversion | `rake redmine:plugins:migrate` | command line | down/up, see "Results" |
 
-The plugin has no routes, permissions, project module, settings, mail, macros, rake tasks or cron: the smoke run lists 0 plugin GET routes, which is correct.
+The plugin has no routes, permissions, project module, settings, mail, macros or cron (one rake task, above): the smoke run lists 0 plugin GET routes, which is correct.
 
-## Findings that are not fixed (pre-existing, same on 5.1)
+## Findings (pre-existing, same on 5.1)
 
-Recorded, not changed (rule: no fixes in passing, and they change behaviour):
-- A formula that uses `id` gets `nil` on the first save of a new object (`before_validation` runs before the insert), so `E2E link` is `https://example.com/track/` on create and gets the id on the next save (issue_computation-created vs -updated; also README example "Link"). Every later save of the issue journals that change once.
-- Computed fields are read-only only on issues (`IssuePatch`). On project settings, my account, user, version, time entry, group and enumeration forms they show as an input; a typed value is overwritten by the formula on save (time entry: 999 typed, 75 stored).
-- `Document` is not in `patch_models` (enumerations such as IssuePriority and DocumentCategory are, through Enumeration): a computed document field can be created but is never computed. Same on 5.1 (Document is customizable there too).
-- Formulas are arbitrary Ruby run with `eval`; anyone who can manage custom fields (admin) can run code on the server. Validation evaluates the formula against a blank object at save time.
-- A formula stored before the upgrade is not re-validated; if it uses an API gone in Ruby 3.3 / Rails 8.1 it blocks every save of the objects it applies to (see "After the upgrade").
+Fixed after Jan's answers:
+- `id` (and `created_on`) were nil on creation, a link built from the id stayed without it until the next save, which then journaled the change: fixed in 4afb67a.
+- Computed fields were read-only only on issues; on the other forms a typed value was overwritten: fixed in 1c06111 / a74ba7d (shown as text).
+- Computed document fields were never computed: fixed in 68944da.
+- A formula stored before the upgrade is not re-validated: the rake task (674d2ad) finds the broken ones.
+
+Not fixed, by design:
+- Formulas are arbitrary Ruby run with `eval`; anyone who can manage custom fields (admin) can run code on the server. That is what the plugin is; only admins reach the form (verified: manager and reporter get 403).
 
 ## Kit notes (the .codex scripts, not changed here)
 
@@ -120,9 +131,10 @@ Recorded, not changed (rule: no fixes in passing, and they change behaviour):
 
 ## Open questions for Jan
 
-1. Read-only computed fields outside issues (see findings). Options: (a) leave as is (current behaviour, value overwritten anyway), (b) hide/disable the input on the other forms (UI change). Recommendation: (a) for the migration; (b) as a separate change if users get confused. Built: (a).
-2. Document custom fields are offered "Computed" but never computed. Options: (a) leave, (b) add `Document` to `patch_models` (one line, new behaviour: existing computed document fields, if any, would start computing and could block saves), (c) hide the section for DocumentCustomField. Recommendation: (b) after checking production has no computed document fields (`SELECT id, name FROM custom_fields WHERE is_computed AND type = 'DocumentCustomField'`). Built: (a), no behaviour change.
-3. Formula audit in production (work item 4) needs production data: run the query in "After the upgrade" before the upgrade.
+None left. Answered 2026-10-06:
+1. Read-only computed fields outside issues: yes, built (1c06111, a74ba7d).
+2. Compute document fields: yes, built (68944da). Check before the upgrade whether production has computed document fields (`SELECT id, name FROM custom_fields WHERE is_computed AND type = 'DocumentCustomField'`): they start computing after the upgrade.
+3. Formula audit: explained; replaced by the rake task (674d2ad), see "After the upgrade".
 
 ## GEOxyz changes to review or re-apply
 
@@ -133,13 +145,13 @@ None: this branch carries no GEOxyz commits of its own (upstream code only).
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
 - No migration of its own to run (schema unchanged); `rake redmine:plugins:migrate` is a no-op for this plugin.
-- BEFORE the upgrade, export and check the formulas: `SELECT id, name, type, field_format, formula FROM custom_fields WHERE is_computed;`
-  and look for APIs gone in Ruby 3.3 / Rails 8.1: `to_s(:` (use `to_fs(:`), `update_attributes`, `errors[...] <<`, `Fixnum`, `Bignum`, `BigDecimal.new`, `File.exists?`, `Dir.exists?`, `URI.escape`, `URI.encode`, `=~` on non-strings, a hash as last positional argument to a keyword method. For example:
-  `grep -nE "to_s\(:|update_attributes|errors\[.*<<|Fixnum|Bignum|BigDecimal\.new|exists\?|URI\.(escape|encode)" formulas.txt`.
-  A stored formula is not re-validated; a broken one makes every save of the matching objects fail with "Error while formula computing in field ...". Fix it in Administration > Custom fields (the form now refuses an invalid formula with the reason).
-- Formulas saved on Redmine 7 before this fix (none at GEOxyz, which runs 5.1 today) could be invalid; the same query finds them.
+- Check the stored formulas ON REDMINE 7 (on 5.1 the old APIs still work, so the check finds nothing there): on a test copy of production upgraded to 7, or right after the upgrade, before users work:
+  `RAILS_ENV=production bundle exec rake redmine:computed_custom_field:check_formulas`
+  It saves nothing, prints `ok` or `FAIL` per computed field with the error and up to 5 failing objects, and exits 1 when one fails. Fix a FAIL in Administration > Custom fields (the form refuses an invalid formula with the reason; typical fixes: `to_s(:db)` -> `to_fs(:db)`, `update_attributes` -> `update`, `Fixnum` -> `Integer`, `BigDecimal.new(x)` -> `BigDecimal(x)`, `File.exists?` -> `File.exist?`, `URI.escape` -> `CGI.escape`/`ERB::Util.url_encode`). `SAMPLE=100` checks more objects per field.
+  A broken formula otherwise makes every save of the matching objects fail with "Error while formula computing in field ...".
+- Changes users notice: computed fields are shown as text (not as an input) on project, user, version, time entry, group, enumeration and document forms; computed document fields start computing; formulas using `id`/`created_on` have them on creation.
+- Before the upgrade, list computed document fields (open question 2): they start computing after the upgrade, and a failing one would block saving documents (the rake task covers them too).
 - Webhooks: nothing to configure for this plugin; payloads carry the computed values.
-- Optional: check for computed document fields (open question 2).
 
 ## How to test
 
