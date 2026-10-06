@@ -21,6 +21,13 @@ class CustomFieldTest < ComputedCustomFieldTestCase
     assert_match(/divided by 0/, exception.message)
   end
 
+  def test_formula_with_syntax_error_is_invalid
+    field = field_with_string_format
+    field.formula = 'cfs[1] +'
+    refute field.valid?
+    assert field.errors[:formula].any?
+  end
+
   def test_computed_custom_field_callbacks
     field = CustomField.find(1).dup
     field.name = 'Test field'

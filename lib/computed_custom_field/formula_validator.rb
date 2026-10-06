@@ -6,7 +6,7 @@ module ComputedCustomField
       define_validate_record_method(object)
       object.validate_record record
     rescue Exception => e
-      record.errors[:formula] << e.message
+      record.errors.add(:formula, e.message)
     end
 
     private
