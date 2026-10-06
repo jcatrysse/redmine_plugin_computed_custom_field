@@ -26,4 +26,17 @@ class CustomFieldsHelperPatchTest < Redmine::HelperTest
     assert_include "project_custom_field_values_#{value.custom_field_id}",
                    custom_field_tag_with_label(:project, value)
   end
+
+  def test_computed_field_of_an_enumeration
+    # enumerations have no visible?, the project activities settings render them
+    field = TimeEntryActivityCustomField.new(name: 'Activity code', field_format: 'string')
+    field.is_computed = true
+    field.formula = 'name.to_s.upcase'
+    field.save!
+    activity = TimeEntryActivity.find(9)
+    activity.save!
+    value = activity.custom_field_values.detect { |v| v.custom_field_id == field.id }
+
+    assert_include 'DESIGN', custom_field_tag("enumerations[#{activity.id}]", value)
+  end
 end
