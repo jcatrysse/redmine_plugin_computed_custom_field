@@ -4,9 +4,18 @@ module ComputedCustomField
 
     included do
       before_validation :eval_computed_fields
+      after_create :eval_computed_fields_after_create
     end
 
     private
+
+    # id, created_on and the like only exist after the insert: compute again,
+    # before after_save stores the custom values. A formula that only fails
+    # now rolls the creation back with its error.
+    def eval_computed_fields_after_create
+      eval_computed_fields
+      raise ActiveRecord::Rollback if errors.any?
+    end
 
     def eval_computed_fields
       custom_field_values.each do |value|

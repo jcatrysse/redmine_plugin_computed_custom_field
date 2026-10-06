@@ -89,6 +89,24 @@ class ModelPatchTest < ComputedCustomFieldTestCase
     assert_equal 'http://example.com/', issue.custom_field_value(field.id)
   end
 
+  def test_id_is_known_on_create
+    field = field_with_string_format
+    field.update_attribute(:formula, 'id.to_s')
+    new_issue = Issue.generate!
+    assert_equal new_issue.id.to_s, new_issue.reload.custom_field_value(field.id)
+  end
+
+  def test_error_after_create_rolls_back
+    field = field_with_string_format
+    field.update_attribute(:formula, "id ? 1 / 0 : 'x'")
+    new_issue = Issue.new(project_id: 1, tracker_id: 1, author_id: 2, subject: 'Rolled back')
+    assert_no_difference 'Issue.count' do
+      assert_not new_issue.save
+    end
+    assert new_issue.new_record?
+    assert_match(/divided by 0/, new_issue.errors[:base].join)
+  end
+
   def test_document_computation
     field = DocumentCustomField.new(name: 'Document code', field_format: 'string')
     field.is_computed = true
