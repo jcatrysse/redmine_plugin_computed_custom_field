@@ -37,12 +37,15 @@ t.check('create issue');
 expect(/\/issues\/\d+$/.test(t.page.url()), `create issue: still on ${t.page.url()}`);
 const issuePath = new URL(t.page.url()).pathname;
 const want = { 'E2E double': '42', 'E2E big': 'Yes', 'E2E level': 'High', 'E2E hours x1.5': '3.00',
-  'E2E due + 1': '12/31/2026', 'E2E owner': 'Manager E2E', 'E2E link': 'https://example.com/track/', 'E2E boom': 'ok' };
+  'E2E due + 1': '12/31/2026', 'E2E owner': 'Manager E2E', 'E2E boom': 'ok' };
 for (const [name, v] of Object.entries(want)) {
   const got = await value(cf[name]);
   expect(got.includes(v), `created issue: ${name} is "${got}", expected "${v}"`);
 }
-await t.shot('created', 'Created with E2E base 21, 2 h, due 2026-12-30, assignee Manager: double 42, big Yes, level High, hours 3.00, due+1 12/31/2026, owner, boom ok; the link has no id yet: before_validation runs before the insert (same on 5.1)');
+const createdId = new URL(t.page.url()).pathname.split('/').pop();
+const link = await value(cf['E2E link']);
+expect(link === `https://example.com/track/${createdId}`, `created issue: E2E link is "${link}", the id is missing`);
+await t.shot('created', 'Created with E2E base 21, 2 h, due 2026-12-30, assignee Manager: double 42, big Yes, level High, hours 3.00, due+1 12/31/2026, owner, boom ok; the link carries the new id (computed again after the insert)');
 
 await t.go(`${issuePath}/edit`);
 for (const name of computed) {
@@ -52,11 +55,12 @@ await t.page.fill(`#issue_custom_field_values_${cf['E2E base']}`, '4');
 await t.page.click('#issue-form input[name=commit]');
 await t.settle();
 t.check('update issue');
-for (const [name, v] of Object.entries({ 'E2E double': '8', 'E2E big': 'No', 'E2E level': 'Low', 'E2E link': `https://example.com/track/${issuePath.split('/').pop()}` })) {
+for (const [name, v] of Object.entries({ 'E2E double': '8', 'E2E big': 'No', 'E2E level': 'Low' })) {
   const got = await value(cf[name]);
   expect(got === v, `updated issue: ${name} is "${got}", expected "${v}"`);
 }
-await t.shot('updated', 'After E2E base 21 -> 4: double 8, big No, level Low, link now with the id; the change of the computed fields is in the history');
+expect(await t.page.locator('#history .details li', { hasText: 'E2E link' }).count() === 0, 'update journaled a change of E2E link');
+await t.shot('updated', 'After E2E base 21 -> 4: double 8, big No, level Low; the history lists only these changes (no late link change) of the computed fields is in the history');
 
 const id = issuePath.split('/').pop();
 await t.go(`/projects/${P}/issues?set_filter=1&f[]=subject&op[subject]=~&v[subject][]=${encodeURIComponent(subject)}` +

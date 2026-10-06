@@ -3,7 +3,8 @@
 #
 # One computed field per customizable model, and on issues one per output format,
 # all driven by the plain integer field "E2E base". "E2E boom" raises when an
-# issue subject contains BOOM, for the runtime error path.
+# issue subject contains BOOM, or contains LATE once the issue has an id (the
+# second computation after the insert), for the runtime error paths.
 
 User.current = User.find_by(login: 'admin')
 
@@ -30,8 +31,6 @@ e2e_cf(IssueCustomField, 'E2E due + 1', field_format: 'date', is_computed: true,
 e2e_cf(IssueCustomField, 'E2E owner', field_format: 'user', is_computed: true, formula: 'assigned_to')
 e2e_cf(IssueCustomField, 'E2E link', field_format: 'link', is_computed: true,
                                      formula: '"https://example.com/track/#{id}"')
-e2e_cf(IssueCustomField, 'E2E boom', field_format: 'string', is_computed: true,
-                                     formula: "subject.to_s.include?('BOOM') ? 1 / 0 : 'ok'")
 
 e2e_cf(ProjectCustomField, 'E2E project code', field_format: 'string', is_computed: true,
                                                formula: '"#{identifier.to_s.upcase}-#{id}"')
@@ -45,6 +44,10 @@ e2e_cf(GroupCustomField, 'E2E group slug', field_format: 'string', is_computed: 
                                            formula: 'lastname.to_s.parameterize')
 e2e_cf(TimeEntryActivityCustomField, 'E2E activity code', field_format: 'string', is_computed: true,
                                                           formula: 'name.to_s.upcase')
+e2e_cf(DocumentCustomField, 'E2E document code', field_format: 'string', is_computed: true,
+                                                  formula: '"#{title.to_s.upcase}-#{id}"')
+e2e_cf(IssueCustomField, 'E2E boom', field_format: 'string', is_computed: true,
+                                     formula: "subject.to_s.include?('BOOM') || (id && subject.to_s.include?('LATE')) ? 1 / 0 : 'ok'")
 
 # webhooks (new in Redmine 7) are off by default; test/e2e/webhook.mjs needs them
 Setting.webhooks_enabled = '1' if Setting.respond_to?(:webhooks_enabled=)
