@@ -67,7 +67,7 @@ Baseline (before any change, branch = master code, 7.0-stable-GEOxyz):
 - e2e baseline (generic smoke + core flows): smoke 10 shots 0 problems, core 6 shots 0 problems.
 
 After this branch:
-- Plugin tests: PostgreSQL 17 runs, 42 assertions, 0 failures, 0 errors; MariaDB 17 runs, 40 assertions (before 245a2f2), 0 failures; 5.1-stable PostgreSQL 17 runs, 40 assertions (before 245a2f2), 0 failures. Together with custom_field_sql and redmine_depending_custom_fields (both `redmine70-migration`): 17 runs, 42 assertions, 0 failures.
+- Plugin tests at the final head: PostgreSQL 17 runs, 42 assertions, 0 failures, 0 errors; MariaDB 17 runs, 42 assertions, 0 failures, 0 errors; 5.1-stable (PostgreSQL, Ruby 3.2.6) 17 runs, 42 assertions, 0 failures, 0 errors. Together with custom_field_sql and redmine_depending_custom_fields (both `redmine70-migration`): 17 runs, 42 assertions, 0 failures.
 - `rails zeitwerk:check`: "All is good!". Production server (eager load) boots.
 - Migrations down to 0 and up again: OK on PostgreSQL and MariaDB (columns `formula`, `is_computed` removed and restored; ConvertCustomFields has no down, it is a data migration that is a no-op on the way down).
 - e2e on PostgreSQL (`./.codex/e2e.sh`, production mode): smoke 10, core 6, plugin scenarios 6 files / 39 shots, 0 problems. On MariaDB (`start_server.sh --reset`): same counts, 0 problems (screenshots looked at, not committed: identical to PostgreSQL). Together with custom_field_sql + redmine_depending_custom_fields: same counts, 0 problems.
@@ -112,6 +112,11 @@ Recorded, not changed (rule: no fixes in passing, and they change behaviour):
 - `start_server.sh` piped into `grep` never returns (the server keeps the pipe open); run it with output to a file.
 - Redmine 5.1 needs Ruby < 3.3: `PATH=/opt/rbenv/versions/3.2.6/bin:$PATH REDMINE_DIR=redmine51`.
 - After switching database.yml between adapters, re-run `test_setup.sh` (the Gemfile.lock follows the adapter).
+
+## Review
+
+- Own adversarial review of the whole diff: no findings (the `eval` keeps the same binding and locals; the include guards are idempotent with eager loading; everything also runs on 5.1).
+- OpenAI review (`./.codex/openai_review.sh`, gpt-5, range f89e8ec..f29d8de, 16 files): "No findings", docs/reviews/openai-2026-10-06-f29d8de.md.
 
 ## Open questions for Jan
 
