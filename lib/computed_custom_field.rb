@@ -9,6 +9,10 @@ module ComputedCustomField
       Issue.send :include, ComputedCustomField::IssuePatch
     end
 
+    unless CustomFieldsHelper.ancestors.include?(ComputedCustomField::CustomFieldTagPatch)
+      CustomFieldsHelper.send :prepend, ComputedCustomField::CustomFieldTagPatch
+    end
+
     models = [
       Enumeration, Group, Issue, Project,
       TimeEntry, User, Version
