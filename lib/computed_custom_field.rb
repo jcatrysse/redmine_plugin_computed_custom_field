@@ -14,7 +14,7 @@ module ComputedCustomField
     end
 
     models = [
-      Enumeration, Group, Issue, Project,
+      Document, Enumeration, Group, Issue, Project,
       TimeEntry, User, Version
     ]
     models.each do |model|

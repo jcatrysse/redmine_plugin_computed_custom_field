@@ -88,4 +88,13 @@ class ModelPatchTest < ComputedCustomFieldTestCase
     issue.save
     assert_equal 'http://example.com/', issue.custom_field_value(field.id)
   end
+
+  def test_document_computation
+    field = DocumentCustomField.new(name: 'Document code', field_format: 'string')
+    field.is_computed = true
+    field.formula = 'title.to_s.upcase'
+    field.save!
+    document = Document.create!(project_id: 1, category_id: 1, title: 'Plan')
+    assert_equal 'PLAN', document.reload.custom_field_value(field.id)
+  end
 end
