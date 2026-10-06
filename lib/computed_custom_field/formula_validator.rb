@@ -30,7 +30,8 @@ module ComputedCustomField
         cfs = cf_ids.each_with_object({}) do |cf_id, hash|
           hash[cf_id] = grouped_cfs[cf_id].first.cast_value '1'
         end
-        eval record.formula
+        # a fixed file name: Ruby 3.3 otherwise puts the server path in the message
+        eval record.formula, binding, '(eval)'
       end
     end
   end

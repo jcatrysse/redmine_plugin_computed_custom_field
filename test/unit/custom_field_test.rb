@@ -26,6 +26,7 @@ class CustomFieldTest < ComputedCustomFieldTestCase
     field.formula = 'cfs[1] +'
     refute field.valid?
     assert field.errors[:formula].any?
+    assert_no_match(/formula_validator\.rb/, field.errors[:formula].join)
   end
 
   def test_computed_custom_field_callbacks
