@@ -131,6 +131,7 @@ Not fixed, by design:
 
 - Own adversarial review of the whole diff: no findings (the `eval` keeps the same binding and locals; the include guards are idempotent with eager loading; everything also runs on 5.1).
 - OpenAI review (`./.codex/openai_review.sh`, gpt-5, range f89e8ec..f29d8de, 16 files): "No findings", docs/reviews/openai-2026-10-06-f29d8de.md.
+- Second round, after Jan's answers: own review found that the rollback after the insert (4afb67a) is lost in an outer transaction; replaced (see "Already on this branch"). OpenAI review of the whole branch (gpt-5, range f89e8ec..d67f448, 22 files): "No findings", docs/reviews/openai-2026-10-06-d67f448.md.
 
 ## Open questions for Jan
 
